@@ -1,7 +1,7 @@
 {
     "version":            "1.1",
     "project_name":       "projeto_embarcados",
-    "project_version":    "027547e-dirty",
+    "project_version":    "5795f8d-dirty",
     "project_path":       "C:/Esp32_Projects/SDFPM/Firmware",
     "idf_path":           "C:/Users/luizn/esp/v5.3.2/esp-idf",
     "build_dir":          "C:/Esp32_Projects/SDFPM/Firmware/build",

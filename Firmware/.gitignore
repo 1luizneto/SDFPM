@@ -1,0 +1,30 @@
+# Arquivo .gitignore para projetos ESP-IDF
+
+# Diretório de Build (Compilação)
+# Contém todos os arquivos compilados (.o, .bin, .elf, etc.).
+/build/
+
+# Componentes gerenciados pelo IDF
+# Baixados automaticamente pelo comando 'idf.py add-dependency'.
+/managed_components/
+
+# Arquivos de configuração do SDK
+# O arquivo principal 'sdkconfig' DEVE ser versionado, mas seus backups não.
+/sdkconfig.old
+/sdkconfig.ci
+
+# Arquivos específicos do VSCode
+# Geralmente contêm caminhos absolutos e configurações locais do seu PC.
+/.vscode/
+
+# Ambientes virtuais Python (caso você crie um)
+/venv/
+/.venv/
+
+# Arquivos de sistema operacional
+.DS_Store
+Thumbs.db
+
+# Arquivos de backup de editores comuns
+*~
+*.bak

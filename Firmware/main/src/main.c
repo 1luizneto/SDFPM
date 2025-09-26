@@ -29,13 +29,13 @@ void app_main(void)
         if (err == ESP_OK)
         {
             // 3. Imprime os dados lidos
-            printf("Accel X: %.2f \t Accel Y: %.2f \t Accel Z: %.2f\n", accel_x, accel_y, accel_z);
+            printf("X %.2f;Y %.2f;Z %.2f\n", accel_x, accel_y, accel_z);
         }
         else
         {
             ESP_LOGE(TAG, "Falha ao ler o acelerômetro: %s", esp_err_to_name(err));
         }
 
-        Delay_ms(tempo(100));
+        Delay_ms(tempo(20));
     }
 }
