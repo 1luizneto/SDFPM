@@ -36,6 +36,6 @@ void app_main(void)
             ESP_LOGE(TAG, "Falha ao ler o acelerômetro: %s", esp_err_to_name(err));
         }
 
-        Delay_ms(tempo(500));
+        Delay_ms(tempo(100));
     }
 }

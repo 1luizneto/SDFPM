@@ -1,4 +1,4 @@
-# Install script for directory: C:/Esp32_Projects/projeto_embarcados/main
+# Install script for directory: C:/Esp32_Projects/SDFPM/Firmware/main
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
