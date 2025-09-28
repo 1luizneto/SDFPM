@@ -238,7 +238,7 @@ class MotorDataProcessor:
             data_by_status = [self.data[self.data['status'] == status][axis] 
                               for status in self.data['status'].unique()]
             bp = axes[0, i].boxplot(data_by_status, 
-                                    tick_labels=self.data['status'].unique(),
+                                    labels=self.data['status'].unique(),
                                     patch_artist=True)
             
             # Colorir as caixas
