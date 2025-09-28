@@ -29,7 +29,7 @@ void app_main(void)
         if (err == ESP_OK)
         {
             // 3. Imprime os dados lidos
-            printf("X %.2f;Y %.2f;Z %.2f\n", accel_x, accel_y, accel_z);
+            printf("X %d;Y %d;Z %d\n", accel_x_raw, accel_y_raw, accel_z_raw);
         }
         else
         {
