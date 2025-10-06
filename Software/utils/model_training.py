@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 import os
 
-CSV_PATH = Path(__file__).resolve().parent.parent / "data" / "csv_files" / "motor_data_training.csv"
+CSV_PATH = Path(__file__).resolve().parent.parent / "data" / "csv_files" / "motor_data_training_numerical.csv"
 
 class MotorCNNTrainer:
     """
@@ -35,7 +35,7 @@ class MotorCNNTrainer:
         
         # Criar diretório se não existir
         os.makedirs(save_dir, exist_ok=True)
-    
+
     def load_data(self, df, feature_columns=None, target_column='label', test_size=0.2, random_state=42):
         """
         Carrega e prepara os dados para treinamento
@@ -51,8 +51,8 @@ class MotorCNNTrainer:
         
         # Features padrão se não especificadas
         if feature_columns is None:
-            feature_columns = ['x', 'y', 'z', 'magnitude', 'x_abs', 'y_abs', 'z_abs']
-        
+            feature_columns = ['x', 'y', 'z', 'adc_raw']
+
         # Verificar se as colunas existem
         missing_cols = [col for col in feature_columns if col not in df.columns]
         if missing_cols:
@@ -74,17 +74,7 @@ class MotorCNNTrainer:
         print(f"   - Samples total: {len(X)}")
         print(f"   - Train: {len(self.X_train)} | Test: {len(self.X_test)}")
         print(f"   - Classes: {np.unique(y)}")
-        
-    def normalize_data(self):
-        """Normaliza os dados usando StandardScaler"""
-        print("🔄 Normalizando dados...")
-        
-        self.scaler = StandardScaler()
-        self.X_train = self.scaler.fit_transform(self.X_train)
-        self.X_test = self.scaler.transform(self.X_test)
-        
-        print("✅ Dados normalizados")
-    
+
     def build_model(self, input_shape=None, num_classes=3, 
                    conv_filters=[32, 64], dense_units=50, dropout_rate=0.3):
         """
@@ -332,25 +322,22 @@ class MotorCNNTrainer:
             # 1. Carregar dados
             self.load_data(df, feature_columns, target_column)
             
-            # 2. Normalizar
-            self.normalize_data()
-            
-            # 3. Construir modelo
+            # 2. Construir modelo
             self.build_model()
             
-            # 4. Treinar
+            # 3. Treinar
             self.train_model(epochs=epochs, batch_size=batch_size)
             
-            # 5. Avaliar
+            # 4. Avaliar
             accuracy, loss = self.evaluate_model()
             
-            # 6. Plotar histórico
+            # 5. Plotar histórico
             self.plot_training_history()
             
-            # 7. Salvar modelo
+            # 6. Salvar modelo
             model_path = self.save_model()
             
-            # 8. Converter para TFLite
+            # 7. Converter para TFLite
             tflite_path = None
             if convert_tflite:
                 tflite_path = self.convert_to_tflite()
@@ -377,7 +364,7 @@ class MotorCNNTrainer:
 
 if __name__ == "__main__":
     # Exemplo de como usar a classe
-
+    df = None
     # Criar instância do trainer
     trainer = MotorCNNTrainer(model_name="sdfpm_motor_v1")
 
@@ -389,9 +376,9 @@ if __name__ == "__main__":
 
     results = trainer.train_complete_pipeline(
         df=df,
-        feature_columns=['x', 'y', 'z'],
+        feature_columns=['x', 'y', 'z', 'adc_raw'],
         target_column='status',
-        batch_size=8, epochs=10,
+        batch_size=16, epochs=100,
         convert_tflite=True
     )
 

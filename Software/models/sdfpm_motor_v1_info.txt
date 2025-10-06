@@ -1,5 +1,5 @@
 model_name: sdfpm_motor_v1
-features: ['x', 'y', 'z']
-input_shape: 3
+features: ['x', 'y', 'z', 'adc_raw']
+input_shape: 4
 num_classes: 3
-timestamp: 2025-09-28T12:19:01.417786
+timestamp: 2025-10-06T19:30:25.436013

@@ -5,12 +5,10 @@ import re
 import os
 from pathlib import Path
 from scipy import stats
-from pathlib import Path
 
 class MotorDataProcessor:
     def __init__(self):
         self.data = None
-        self.processed_data = None
         
         # Configurar estrutura de pastas
         self.folder = Path(__file__).parent.parent
@@ -23,32 +21,26 @@ class MotorDataProcessor:
     def parse_sensor_line(self, line):
         """
         Processa uma linha do arquivo de dados do sensor
-        Formato: timestamp -> X value;Y value;Z value
+        Formato: X value;Y value;Z value;ADC_RAW value;ADC_MV value;VOLTAGE value
         """
-        if not line.strip() or '->' not in line:
+        if not line.strip():
             return None
             
         try:
-            parts = line.split('->')
-            if len(parts) != 2:
-                return None
-                
-            timestamp = parts[0].strip()
-            coords = parts[1].strip()
-            
-            # Extrair valores X, Y, Z usando regex
-            x_match = re.search(r'X (-?\d+)', coords)
-            y_match = re.search(r'Y (-?\d+)', coords)
-            z_match = re.search(r'Z (-?\d+)', coords)
-            
-            if not all([x_match, y_match, z_match]):
+            # Extrair valores X, Y, Z, ADC_RAW usando regex
+            x_match = re.search(r'X (-?\d+)', line)
+            y_match = re.search(r'Y (-?\d+)', line)
+            z_match = re.search(r'Z (-?\d+)', line)
+            adc_raw_match = re.search(r'ADC_RAW (\d+)', line)
+
+            if not all([x_match, y_match, z_match, adc_raw_match]):
                 return None
                 
             return {
-                'timestamp': timestamp,
                 'x': int(x_match.group(1)),
                 'y': int(y_match.group(1)),
-                'z': int(z_match.group(1))
+                'z': int(z_match.group(1)),
+                'adc_raw': int(adc_raw_match.group(1))
             }
         except:
             return None
@@ -95,55 +87,6 @@ class MotorDataProcessor:
         
         return self.data
     
-    def create_features(self):
-        """
-        Cria features adicionais a partir dos dados brutos
-        """
-        if self.data is None:
-            print("Nenhum dado carregado!")
-            return None
-        
-        df = self.data.copy()
-        
-        # Magnitude do vetor (vibração total)
-        df['magnitude'] = np.sqrt(df['x']**2 + df['y']**2 + df['z']**2)
-        
-        # Features estatísticas por janela temporal
-        # Convertendo timestamp para datetime (assumindo formato HH:MM:SS:mmm)
-        try:
-            df['time_parsed'] = pd.to_datetime(df['timestamp'], format='%H:%M:%S:%f')
-        except:
-            # Se não conseguir converter, criar índice sequencial
-            df['time_parsed'] = pd.to_datetime(range(len(df)), unit='ms')
-        
-        # Ordenar por tempo
-        df = df.sort_values('time_parsed')
-        
-        # Features de janela móvel (últimas N amostras)
-        window_size = 10
-        
-        for axis in ['x', 'y', 'z', 'magnitude']:
-            # Média móvel
-            df[f'{axis}_mean'] = df[axis].rolling(window=window_size, min_periods=1).mean()
-            
-            # Desvio padrão móvel
-            df[f'{axis}_std'] = df[axis].rolling(window=window_size, min_periods=1).std()
-            
-            # Valor máximo na janela
-            df[f'{axis}_max'] = df[axis].rolling(window=window_size, min_periods=1).max()
-            
-            # Valor mínimo na janela
-            df[f'{axis}_min'] = df[axis].rolling(window=window_size, min_periods=1).min()
-            
-            # Range na janela
-            df[f'{axis}_range'] = df[f'{axis}_max'] - df[f'{axis}_min']
-        
-        # Features de frequência (FFT básica)
-        # Para cada janela, calcular componentes dominantes
-        
-        self.processed_data = df
-        return df
-    
     def analyze_data(self):
         """
         Realiza análise estatística dos dados
@@ -169,14 +112,13 @@ class MotorDataProcessor:
                 print(f"  Max: {values.max()}")
                 print(f"  Range: {values.max() - values.min()}")
             
-            # Magnitude
-            magnitude = np.sqrt(subset['x']**2 + subset['y']**2 + subset['z']**2)
-            print(f"\nMagnitude:")
-            print(f"  Média: {magnitude.mean():.2f}")
-            print(f"  Desvio: {magnitude.std():.2f}")
-            print(f"  Min: {magnitude.min():.2f}")
-            print(f"  Max: {magnitude.max():.2f}")
-    
+            # ADC
+            print(f"\nADC_RAW:")
+            print(f"  Média: {subset['adc_raw'].mean():.2f}")
+            print(f"  Desvio: {subset['adc_raw'].std():.2f}")
+            print(f"  Min: {subset['adc_raw'].min()}")
+            print(f"  Max: {subset['adc_raw'].max()}")
+
     def detect_outliers(self, method='zscore', threshold=3):
         """
         Detecta outliers nos dados
@@ -204,22 +146,18 @@ class MotorDataProcessor:
         
         return outliers_mask
     
-    def save_to_csv(self, filename="motor_data.csv", include_features=True):
+    def save_to_csv(self, filename="motor_data.csv"):
         """
-        Salva os dados processados em CSV
+        Salva os dados em CSV
         """
-        if include_features and self.processed_data is not None:
-            data_to_save = self.processed_data
-        elif self.data is not None:
-            data_to_save = self.data
-        else:
+        if self.data is None:
             print("Nenhum dado para salvar!")
             return
         
-        data_to_save.to_csv(filename, index=False)
+        self.data.to_csv(filename, index=False)
         print(f"Dados salvos em: {filename}")
-        print(f"Shape: {data_to_save.shape}")
-        print(f"Colunas: {list(data_to_save.columns)}")
+        print(f"Shape: {self.data.shape}")
+        print(f"Colunas: {list(self.data.columns)}")
     
     def plot_data_analysis(self, save_plots=False):
         """
@@ -277,75 +215,27 @@ class MotorDataProcessor:
         axes[1, 1].legend()
         axes[1, 1].grid(True, alpha=0.3)
         
-        # Série temporal da magnitude (calculando aqui mesmo)
-        magnitude_series = np.sqrt(self.data['x']**2 + self.data['y']**2 + self.data['z']**2)
+        # ADC por status
+        for i, status in enumerate(self.data['status'].unique()):
+            subset = self.data[self.data['status'] == status]
+            axes[1, 2].hist(subset['adc_raw'], alpha=0.7, label=status, bins=30,
+                           color=colors[i % len(colors)])
         
-        # Mostrar primeiras amostras de cada status se disponível
-        sample_size = min(100, len(self.data))
-        sample_magnitude = magnitude_series.head(sample_size)
-        
-        axes[1, 2].plot(range(len(sample_magnitude)), sample_magnitude, 
-                        'b-', linewidth=1.5, alpha=0.8)
-        axes[1, 2].set_title(f'Série Temporal da Magnitude (Primeiras {sample_size} amostras)')
-        axes[1, 2].set_xlabel('Índice da Amostra')
-        axes[1, 2].set_ylabel('Magnitude')
+        axes[1, 2].set_title('Distribuição ADC_RAW')
+        axes[1, 2].set_xlabel('ADC_RAW')
+        axes[1, 2].set_ylabel('Frequência')
+        axes[1, 2].legend()
         axes[1, 2].grid(True, alpha=0.3)
+        
+        plt.tight_layout()
         
         if save_plots:
             caminho_to_save = self.images_folder / 'motor_analysis.png'
             plt.savefig(caminho_to_save, dpi=300, bbox_inches='tight')
             print(f"Gráfico salvo como: {caminho_to_save}")
         
-        # Criar gráfico adicional para séries temporais por status
-        self._plot_time_series_by_status(save_plots)
-    
-    def _plot_time_series_by_status(self, save_plots=False):
-        """
-        Cria gráfico separado para séries temporais por status
-        """
-        fig, axes = plt.subplots(2, 2, figsize=(15, 11))
-        fig.suptitle('Séries Temporais por Status do Motor', fontsize=14, fontweight='bold')
-        
-        colors = {'ligado': 'blue', 'desligado': 'green', 'defeito': 'red'}
-        
-        for i, axis in enumerate(['x', 'y', 'z']):
-            ax = axes[i//2, i%2] if i < 3 else axes[1, 1]
-            
-            for status in self.data['status'].unique():
-                subset = self.data[self.data['status'] == status]
-                sample_size = min(30, len(subset))  # Primeiras 30 amostras
-                subset_sample = subset.head(sample_size)
-                
-                ax.plot(range(len(subset_sample)), subset_sample[axis], 
-                        label=status, alpha=0.8, linewidth=1.5,
-                        color=colors.get(status, 'black'))
-            
-            ax.set_title(f'Eixo {axis.upper()}')
-            ax.set_xlabel('Amostra')
-            ax.set_ylabel(f'Valor {axis.upper()}')
-            ax.legend()
-            ax.grid(True, alpha=0.3)
-            
-        for status in self.data['status'].unique():
-            subset = self.data[self.data['status'] == status]
-            sample_size = min(30, len(subset))
-            subset_sample = subset.head(sample_size)
-            magnitude = np.sqrt(subset_sample['x']**2 + subset_sample['y']**2 + subset_sample['z']**2)
-            
-            axes[1, 1].plot(range(len(magnitude)), magnitude, 
-                            label=status, alpha=0.8, linewidth=2,
-                            color=colors.get(status, 'black'))
-        
-        axes[1, 1].set_title('Magnitude')
-        axes[1, 1].set_xlabel('Amostra')
-        axes[1, 1].set_ylabel('Magnitude')
-        axes[1, 1].legend()
-        axes[1, 1].grid(True, alpha=0.3)
-        
-        if save_plots:
-            caminho_to_save = self.images_folder / 'motor_time_series.png'
-            plt.savefig(caminho_to_save, dpi=300, bbox_inches='tight')
-            print(f"Gráfico de séries temporais salvo como: {caminho_to_save}")
+        plt.show()
+
 def main():
     # Inicializar o processador
     folder = Path(__file__).parent.parent 
@@ -354,9 +244,9 @@ def main():
     
     # Configurar arquivos (ajuste os caminhos conforme sua estrutura de pastas)
     file_configs = [
-        (folder / "data/txt_files/motor_ligado_26_09.txt", "ligado"),
-        (folder / "data/txt_files/motor_desligado_26_09.txt", "desligado"),
-        (folder / "data/txt_files/motor_com_falha_26_09.txt", "defeito")
+        (folder / "data/txt_files/Teste com o motor ligado 03.10.txt", "ligado"),
+        (folder / "data/txt_files/teste com o motor desligado 03.10.txt", "desligado"),
+        (folder / "data/txt_files/Teste com o motor com falha 03.10.txt", "defeito")
     ]
     
     print("\n=== PROCESSADOR DE DADOS DO MOTOR ===")
@@ -372,20 +262,16 @@ def main():
         print("\n3. Detectando outliers...")
         outliers = processor.detect_outliers()
         
-        print("\n4. Criando features...")
-        processed_data = processor.create_features()
+        print("\n4. Salvando em CSV...")
+        processor.save_to_csv(str(folder / "data/csv_files/motor_data_training.csv"))
         
-        print("\n5. Salvando em CSV...")
-        processor.save_to_csv(str(processor.folder / "data/csv_files/motor_data_processed.csv"), include_features=True)
-        processor.save_to_csv(str(processor.folder / "data/csv_files/motor_data_raw.csv"), include_features=False)
-        
-        print("\n6. Gerando e salvando gráficos...")
+        print("\n5. Gerando e salvando gráficos...")
         processor.plot_data_analysis(save_plots=True)
         
         print("\n\n=== RESUMO ===")
         print(f"Total de amostras: {len(data)}")
-        print(f"Features criadas: {processed_data.shape[1] if processed_data is not None else 'N/A'}")
-        print("Arquivos CSV e gráficos salvos com sucesso!")
+        print(f"Colunas: {list(data.columns)}")
+        print("Arquivo CSV e gráficos salvos com sucesso!")
         
     else:
         print("\nNenhum dado foi carregado. Verifique os caminhos e o conteúdo dos arquivos de entrada.")
