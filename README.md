@@ -1,128 +1,46 @@
-# SDFPM
-Sistemas de Detecção de Falhas Preditiva de Motor DC
+# SDFPM - Sistemas de Detecção de Falhas Preditiva de Motor DC
 
-# Software
 
-## Estrutura de Pastas
+# 1. Objetivo Geral
+Este projeto consiste no desenvolvimento de um sistema embarcado autônomo e inteligente para o monitoramento e diagnóstico de falhas em motores elétricos em tempo real. O objetivo é criar uma ferramenta de manutenção preditiva completa, desde a coleta de dados na ponta até a visualização e interação pelo usuário. O resultado será um protótipo funcional capaz de classificar a operação do motor como "normal", "desligado" ou "com falha/anomalia".
 
-O projeto está organizado com a seguinte estrutura:
+# 2. Arquitetura do Sistema
+O sistema é composto por três pilares principais: o hardware embarcado, o aplicativo móvel e a plataforma de visualização de dados.
 
-```
-SDFPM/
-├── data/
-│   ├── csv_files/         # Arquivos CSV gerados pelo processamento
-│   │   ├── motor_data_processed.csv
-│   │   └── motor_data_raw.csv
-│   ├── txt_files/         # Arquivos brutos de dados do sensor
-│   │   ├── motor_ligado_26_09.txt
-│   │   ├── motor_desligado_26_09.txt
-│   │   └── motor_com_falha_26_09.txt
-│   └── images/            # Gráficos gerados pela análise
-│       ├── motor_analysis.png
-│       └── motor_time_series.png
-├── utils/
-│   └── data_analysys.py   # Script de processamento e análise de dados
-└── requirements.txt       # Dependências do projeto
-```
+ ## Hardware Embarcado
+* Microcontrolador: ESP32-S3, escolhido por seu poder de processamento dual-core, conectividade Wi-Fi/Bluetooth e capacidade para executar modelos de Machine Learning.
 
-## Sobre o Processador de Dados
+Sensores:
+  * Unidade de Medição Inercial (IMU): MPU6500 para coletar dados de vibração de alta frequência nos três eixos (X, Y, Z).
+  * Sensor de Corrente: Módulo para monitorar o consumo elétrico do motor, um indicador chave de seu esforço e eficiência.
 
-O arquivo `data_analysys.py` contém a implementação do `MotorDataProcessor`, uma classe responsável por:
+# Software e Plataformas
 
-1. Carregar dados brutos de vibração do motor DC
-2. Processar e transformar os dados
-3. Gerar features adicionais baseadas nos valores X, Y, Z do acelerômetro
-4. Criar visualizações e análises estatísticas
-5. Detectar outliers e anomalias
-6. Salvar dados processados em formato CSV para treinamento de modelos
+* Firmware: Desenvolvido em C/C++ utilizando o framework ESP-IDF. Responsável pela coleta de dados, processamento e execução do modelo TinyML.
 
-O script analisa três estados do motor:
-- **Ligado**: Funcionamento normal
-- **Desligado**: Motor sem operação
-- **Defeito**: Motor com falhas simuladas
+* Aplicativo Móvel (Android/iOS): Interface de usuário para configuração, controle e visualização rápida do status do motor.
 
-## Instalação e Execução
+* Dashboard de Monitoramento: Uma plataforma web, como o Grafana, para análise detalhada e histórica dos dados.
 
-### Pré-requisitos
-- Python 3.8 ou superior
-- pip (gerenciador de pacotes)
+# 3. Funcionalidades Principais
+ ## Coleta de Dados Multissensorial
+O firmware do ESP32 irá coletar, em tempo real e de forma sincronizada, os dados de vibração do MPU6500 e o consumo de corrente do sensor dedicado.
 
-### Instalação no Linux
+# Processamento e Análise Embarcada com TinyML
+Um modelo de Machine Learning, otimizado para ambientes com recursos limitados (TinyML), será treinado e implementado diretamente no ESP32-S3. Este modelo analisará os dados brutos para classificar o estado do motor, permitindo um diagnóstico instantâneo sem depender de conexão constante com a nuvem.
 
-1. Clone o repositório e navegue até a pasta do projeto:
-```bash
-git clone git@github.com:1luizneto/SDFPM.git
-cd SDFPM
-```
+# Aplicativo Móvel para Interação e Controle
+* Configuração do Dispositivo: Comunicação via Bluetooth Low Energy (BLE) para configuração inicial (credenciais de Wi-Fi, sensibilidade dos sensores, etc.).
 
-2. Crie um ambiente virtual:
-```bash
-python3 -m venv venv
-```
+* Visualização da "Saúde" do Motor: Exibição clara e intuitiva do status atual do motor (e.g., indicador verde/amarelo/vermelho).
 
-3. Ative o ambiente virtual:
-```bash
-source venv/bin/activate
-```
+* Modos de Operação: Permitir que o usuário alterne entre modos como "Monitoramento Contínuo" ou "Diagnóstico sob Demanda".
 
-4. Instale as dependências:
-```bash
-pip install -r requirements.txt
-```
+* Alertas e Notificações: Envio de notificações push ao usuário em caso de detecção de falha.
 
-### Instalação no Windows
+# Dashboard de Monitoramento Remoto (Grafana)
+* Conectividade: O ESP32 enviará os dados coletados (vibração, corrente e diagnóstico) via Wi-Fi para um banco de dados.
 
-1. Clone o repositório e navegue até a pasta do projeto:
-```bash
-git clone git@github.com:1luizneto/SDFPM.git
-cd SDFPM
-```
+* Visualização Histórica: Gráficos detalhados para exibir o histórico de operação do motor.
 
-2. Crie um ambiente virtual:
-```bash
-python -m venv venv
-```
-
-3. Ative o ambiente virtual:
-```bash
-venv\Scripts\activate
-```
-
-4. Instale as dependências:
-```bash
-pip install -r requirements.txt
-```
-
-## Executando a Análise de Dados
-
-Com o ambiente virtual ativado, execute o script de análise:
-
-```bash
-# No Linux
-python utils/data_analysys.py
-
-# No Windows
-python utils\data_analysys.py
-```
-
-O script irá:
-1. Carregar os arquivos de texto com os dados do sensor
-2. Analisar estatisticamente os dados
-3. Detectar possíveis outliers
-4. Criar features adicionais para análise e modelagem
-5. Gerar gráficos e visualizações na pasta `data/images/`
-6. Salvar os dados processados em CSVs na pasta `data/csv_files/`
-
-## Saídas Geradas
-
-- **CSVs**: 
-  - `motor_data_raw.csv`: Dados brutos organizados
-  - `motor_data_processed.csv`: Dados com features adicionais
-
-- **Visualizações**:
-  - `motor_analysis.png`: Análise comparativa entre estados do motor
-  - `motor_time_series.png`: Séries temporais das vibrações por eixo
-
-## Personalização
-
-Para analisar novos conjuntos de dados, adicione os arquivos TXT na pasta `data/txt_files/` e atualize as configurações no método `main()` do script. 
+* Análise de Tendências: Ferramenta para que equipes de manutenção possam analisar tendências de longo prazo e identificar a degradação sutil do motor ao longo do tempo.
