@@ -1,197 +1,475 @@
+# NexusML API - API de Geração de Modelos TinyML
 
-# Software
+API REST desenvolvida com Django para geração automática de modelos de Machine Learning em formato TensorFlow Lite (TinyML) para sistemas embarcados.
 
-## Estrutura de Pastas
+## 🚀 Funcionalidades
 
-O projeto está organizado com a seguinte estrutura:
+- ✅ Upload de arquivos CSV e TXT
+- ✅ Processamento automático de dados com delimitadores configuráveis
+- ✅ Suporte a múltiplos arquivos por projeto
+- ✅ Criação automática de variáveis alvo (target)
+- ✅ Treinamento de modelos CNN 1D genéricos
+- ✅ Conversão automática para TensorFlow Lite (quantizado)
+- ✅ Download de modelos .tflite
+- ✅ Visualização de métricas e estatísticas
 
-```
-SDFPM/
-├── data/
-│   ├── csv_files/         # Arquivos CSV gerados pelo processamento
-│   │   ├── motor_data_processed.csv
-│   │   ├── motor_data_raw.csv
-│   │   └── motor_data_training.csv
-│   ├── txt_files/         # Arquivos brutos de dados do sensor
-│   │   ├── motor_ligado_26_09.txt
-│   │   ├── motor_desligado_26_09.txt
-│   │   └── motor_com_falha_26_09.txt
-│   └── images/            # Gráficos gerados pela análise
-│       ├── motor_analysis.png
-│       └── motor_time_series.png
-├── models/                # Modelos de machine learning treinados
-├── utils/
-│   ├── data_analysys.py   # Script de processamento e análise de dados
-│   ├── data_etl.py        # Script para transformação dos dados
-│   └── model_training.py  # Script de treinamento de modelo de ML
-├── .gitignore             # Configuração de arquivos ignorados pelo Git
-├── requirements.txt       # Dependências do projeto
-└── README.md              # Documentação do projeto
-```
+## 📋 Pré-requisitos
 
-## Processamento e Análise de Dados
+- Python 3.10+
+- Todas as dependências do `requirements.txt`
 
-### Processador de Dados (data_analysys.py)
+## 🔧 Instalação
 
-O arquivo `data_analysys.py` implementa o `MotorDataProcessor`, uma classe responsável por:
-
-1. Carregar dados brutos de vibração do motor DC
-2. Processar e transformar os dados
-3. Gerar features adicionais baseadas nos valores X, Y, Z do acelerômetro
-4. Criar visualizações e análises estatísticas
-5. Detectar outliers e anomalias
-6. Salvar dados processados em formato CSV para treinamento de modelos
-
-O script analisa três estados do motor:
-- **Ligado**: Funcionamento normal
-- **Desligado**: Motor sem operação
-- **Defeito**: Motor com falhas simuladas
-
-### ETL de Dados (data_etl.py)
-
-O arquivo `data_etl.py` realiza a transformação dos dados para o formato adequado para treinamento:
-
-1. Carrega os dados brutos processados (`motor_data_raw.csv`)
-2. Remove colunas desnecessárias (como timestamp)
-3. Converte categorias de status para valores numéricos:
-   - Ligado: 1
-   - Desligado: 0
-   - Defeito: 2
-4. Salva os dados transformados para treinamento (`motor_data_training.csv`)
-
-## Modelagem de Machine Learning
-
-### Treinamento do Modelo (model_training.py)
-
-O arquivo `model_training.py` implementa o `MotorCNNTrainer`, uma classe para treinamento de modelos CNN 1D para classificar o estado do motor:
-
-1. Carrega os dados de treinamento
-2. Realiza pré-processamento e normalização
-3. Constrói um modelo CNN 1D usando TensorFlow/Keras
-4. Treina o modelo com validação cruzada
-5. Avalia o desempenho do modelo
-6. Gera visualizações do processo de treinamento
-7. Exporta o modelo para formatos H5 e TFLite (para ESP32)
-
-Os modelos treinados são armazenados na pasta `models/`, incluindo:
-- Modelo em formato H5
-- Modelo quantizado em formato TFLite para ESP32
-- Arquivo de escala para normalização
-- Informações sobre o modelo e features utilizadas
-
-## Instalação e Execução
-
-### Pré-requisitos
-- Python 3.8 ou superior
-- pip (gerenciador de pacotes)
-
-### Instalação no Linux
-
-1. Clone o repositório e navegue até a pasta do projeto:
 ```bash
-git clone git@github.com:1luizneto/SDFPM.git
-cd SDFPM
-```
+# Clonar repositório
+cd "NexusML API"
 
-2. Crie um ambiente virtual:
-```bash
-python3 -m venv venv
-```
-
-3. Ative o ambiente virtual:
-```bash
-source venv/bin/activate
-```
-
-4. Instale as dependências:
-```bash
-pip install -r requirements.txt
-```
-
-### Instalação no Windows
-
-1. Clone o repositório e navegue até a pasta do projeto:
-```bash
-git clone git@github.com:1luizneto/SDFPM.git
-cd SDFPM
-```
-
-2. Crie um ambiente virtual:
-```bash
+# Criar ambiente virtual
 python -m venv venv
-```
 
-3. Ative o ambiente virtual:
-```bash
+# Ativar ambiente virtual (Windows)
 venv\Scripts\activate
-```
 
-4. Instale as dependências:
-```bash
+# Instalar dependências
 pip install -r requirements.txt
+
+# Aplicar migrations
+cd core
+python manage.py migrate
+
+# Criar superusuário
+python manage.py createsuperuser
+
+# Iniciar servidor
+python manage.py runserver
 ```
 
-## Executando os Scripts
+## 📡 Endpoints da API
 
-Com o ambiente virtual ativado, execute os scripts na seguinte ordem:
+### Base URL
+```
+http://127.0.0.1:8000/api/
+```
 
-### 1. Processamento de Dados
+### 📚 Documentação Interativa (Swagger/OpenAPI)
+
+Acesse a documentação interativa da API através do Swagger UI:
+
+#### Swagger UI (Recomendado)
+```
+http://127.0.0.1:8000/api/docs/
+```
+Interface visual completa para testar todos os endpoints diretamente no navegador.
+
+#### ReDoc (Alternativa)
+```
+http://127.0.0.1:8000/api/redoc/
+```
+Documentação em estilo de livro, ideal para leitura.
+
+#### OpenAPI Schema (JSON)
+```
+http://127.0.0.1:8000/api/schema/
+```
+Schema OpenAPI 3.0 em formato JSON para integração com outras ferramentas.
+
+---
+
+### 1. **Projetos**
+
+#### Listar todos os projetos
+```http
+GET /api/projects/
+```
+
+#### Criar novo projeto
+```http
+POST /api/projects/
+Content-Type: application/json
+
+{
+    "name": "Motor Classifier",
+    "description": "Classificação de estados do motor"
+}
+```
+
+#### Obter detalhes de um projeto
+```http
+GET /api/projects/{project_id}/
+```
+
+#### Deletar projeto
+```http
+DELETE /api/projects/{project_id}/
+```
+
+---
+
+### 2. **Upload de Arquivos**
+
+#### Upload de arquivo para um projeto
+```http
+POST /api/projects/{project_id}/upload/
+Content-Type: multipart/form-data
+
+Form Data:
+- file: [arquivo.csv ou arquivo.txt]
+- delimiter: "," ou ";" ou outro
+- target_label: "ligado" (opcional - label para este arquivo)
+- has_target_column: "false" (se já tem coluna target, use "true")
+```
+
+**Exemplo com cURL:**
+```bash
+curl -X POST http://127.0.0.1:8000/api/projects/{project_id}/upload/ \
+  -F "file=@motor_ligado.txt" \
+  -F "delimiter=;" \
+  -F "target_label=ligado" \
+  -F "has_target_column=false"
+```
+
+---
+
+### 3. **Preview de Dados**
+
+#### Visualizar dados consolidados do projeto
+```http
+GET /api/projects/{project_id}/preview/
+```
+
+**Resposta:**
+```json
+{
+    "project": {...},
+    "statistics": {
+        "total_rows": 1500,
+        "total_columns": 5,
+        "columns": ["x", "y", "z", "adc_raw", "target"],
+        "column_stats": {...}
+    },
+    "preview_rows": [...],
+    "total_files": 3
+}
+```
+
+---
+
+### 4. **Modelos de ML**
+
+#### Listar todos os modelos
+```http
+GET /api/models/
+```
+
+#### Filtrar modelos por projeto
+```http
+GET /api/models/?project={project_id}
+```
+
+#### Treinar novo modelo
+```http
+POST /api/models/train/
+Content-Type: application/json
+
+{
+    "project_id": "uuid-do-projeto",
+    "model_name": "Motor Classifier v1",
+    "version": "1.0.0",
+    "feature_columns": ["x", "y", "z", "adc_raw"],
+    "target_column": "target",
+    "epochs": 100,
+    "batch_size": 32,
+    "test_size": 0.2
+}
+```
+
+**Resposta:**
+```json
+{
+    "id": "uuid-do-modelo",
+    "name": "Motor Classifier v1",
+    "status": "completed",
+    "accuracy": 0.9567,
+    "loss": 0.1234,
+    "model_size_kb": 45.6,
+    "training_time_seconds": 125.4,
+    "tflite_model_url": "http://..."
+}
+```
+
+#### Download do modelo TFLite
+```http
+GET /api/models/{model_id}/download/
+```
+
+**Resposta:**
+```json
+{
+    "download_url": "http://127.0.0.1:8000/media/models/.../modelo.tflite",
+    "file_name": "modelo.tflite",
+    "size_kb": 45.6
+}
+```
+
+#### Obter métricas detalhadas
+```http
+GET /api/models/{model_id}/metrics/
+```
+
+**Resposta:**
+```json
+{
+    "model_id": "uuid",
+    "accuracy": 0.9567,
+    "loss": 0.1234,
+    "confusion_matrix": [[100, 5], [3, 92]],
+    "classification_report": {...},
+    "training_history": {
+        "loss": [...],
+        "accuracy": [...],
+        "val_loss": [...],
+        "val_accuracy": [...]
+    }
+}
+```
+
+---
+
+## 📊 Fluxo de Uso Completo
+
+### Cenário 1: Múltiplos arquivos com criação de labels
 
 ```bash
-# No Linux
-python utils/data_analysys.py
+# 1. Criar projeto
+POST /api/projects/
+{
+    "name": "Motor Classifier",
+    "description": "Detectar estados do motor"
+}
+# Resposta: { "id": "abc-123", ... }
 
-# No Windows
-python utils\data_analysys.py
+# 2. Upload arquivo 1 - Motor Ligado
+POST /api/projects/abc-123/upload/
+FormData:
+  - file: motor_ligado.txt
+  - delimiter: ";"
+  - target_label: "ligado"
+
+# 3. Upload arquivo 2 - Motor Desligado
+POST /api/projects/abc-123/upload/
+FormData:
+  - file: motor_desligado.txt
+  - delimiter: ";"
+  - target_label: "desligado"
+
+# 4. Upload arquivo 3 - Motor com Defeito
+POST /api/projects/abc-123/upload/
+FormData:
+  - file: motor_defeito.txt
+  - delimiter: ";"
+  - target_label: "defeito"
+
+# 5. Verificar preview dos dados
+GET /api/projects/abc-123/preview/
+
+# 6. Treinar modelo
+POST /api/models/train/
+{
+    "project_id": "abc-123",
+    "model_name": "Motor Classifier",
+    "feature_columns": ["x", "y", "z", "adc_raw"],
+    "target_column": "target",
+    "epochs": 100,
+    "batch_size": 32
+}
+
+# 7. Aguardar treinamento e baixar modelo
+GET /api/models/{model_id}/download/
 ```
 
-Este script irá:
-- Carregar os arquivos de texto com os dados do sensor
-- Analisar estatisticamente os dados
-- Detectar possíveis outliers
-- Criar features adicionais para análise e modelagem
-- Gerar gráficos e visualizações na pasta `data/images/`
-- Salvar os dados processados em CSVs na pasta `data/csv_files/`
-
-### 2. Transformação de Dados
+### Cenário 2: Arquivo único com labels já incluídas
 
 ```bash
-# No Linux
-python utils/data_etl.py
+# 1. Criar projeto
+POST /api/projects/
+{
+    "name": "Sensor Classifier"
+}
 
-# No Windows
-python utils\data_etl.py
+# 2. Upload arquivo completo
+POST /api/projects/{id}/upload/
+FormData:
+  - file: dataset_completo.csv
+  - delimiter: ","
+  - has_target_column: "true"
+
+# 3. Treinar modelo
+POST /api/models/train/
+{
+    "project_id": "{id}",
+    "model_name": "Sensor Model",
+    "feature_columns": ["sensor1", "sensor2", "sensor3"],
+    "target_column": "label"
+}
 ```
 
-Este script transforma os dados brutos para o formato adequado para treinamento.
+---
 
-### 3. Treinamento do Modelo
+## 🏗️ Arquitetura
 
-```bash
-# No Linux
-python utils/model_training.py
-
-# No Windows
-python utils\model_training.py
+```
+NexusML API/
+├── context/
+│   └── task-implementation-plan.md    # Plano de implementação
+├── core/
+│   ├── manage.py
+│   ├── core/
+│   │   ├── settings.py                # Configurações Django
+│   │   └── urls.py                    # URLs principais
+│   └── studio/
+│       ├── models.py                  # Models: Project, DataFile, MLModel
+│       ├── serializers.py             # Serializers DRF
+│       ├── views.py                   # ViewSets e endpoints
+│       ├── services.py                # GenericDataProcessor & GenericCNNTrainer
+│       └── urls.py                    # URLs do app
+└── requirements.txt
 ```
 
-Este script treina o modelo CNN 1D e exporta os artefatos resultantes para a pasta `models/`.
+---
 
-## Saídas Geradas
+## 🔍 Modelos Django
 
-- **CSVs**: 
-  - `motor_data_raw.csv`: Dados brutos organizados
-  - `motor_data_processed.csv`: Dados com features adicionais
-  - `motor_data_training.csv`: Dados preparados para treinamento
+### Project
+- Agrupa datasets e modelos
+- Status: creating, ready, processing, error
 
-- **Visualizações**:
-  - `motor_analysis.png`: Análise comparativa entre estados do motor
-  - `motor_time_series.png`: Séries temporais das vibrações por eixo
-  - `sdfpm_motor_v1_training.png`: Gráficos de acurácia e loss do treinamento
+### DataFile
+- Arquivo de dados (CSV/TXT)
+- Configurações: delimiter, target_label, has_target_column
+- Metadados: rows_count, columns (estatísticas)
 
-- **Modelos**:
-  - Modelos treinados e artefatos relacionados na pasta `models/`
+### MLModel
+- Modelo treinado
+- Arquivos: keras_model (.h5), tflite_model (.tflite), scaler (.pkl)
+- Métricas: accuracy, loss, confusion_matrix, classification_report
+- Status: pending, training, completed, failed
 
-## Personalização
+---
 
-Para analisar novos conjuntos de dados, adicione os arquivos TXT na pasta `data/txt_files/` e atualize as configurações nos respectivos scripts conforme necessário.
+## 📈 Processamento de Dados
+
+O `GenericDataProcessor` realiza:
+- ✅ Parse de CSV/TXT com delimitadores configuráveis
+- ✅ Detecção automática de tipos de colunas
+- ✅ Geração de estatísticas descritivas
+- ✅ Detecção de outliers (zscore ou IQR)
+- ✅ Consolidação de múltiplos arquivos
+- ✅ Adição de labels automáticos
+
+## 🤖 Treinamento de Modelos
+
+O `GenericCNNTrainer` implementa:
+- ✅ CNN 1D genérica e adaptável
+- ✅ Normalização automática (StandardScaler)
+- ✅ Encoding de labels categóricos
+- ✅ Early stopping
+- ✅ Conversão para TFLite com quantização int8
+- ✅ Métricas completas (accuracy, loss, confusion matrix, classification report)
+
+---
+
+## 🔐 Admin Django
+
+Acesse: `http://127.0.0.1:8000/admin/`
+
+Usuário: `admin`
+Senha: admin123
+
+---
+
+## 🧪 Testes
+
+### Testar com Postman ou Insomnia
+
+Importe a coleção de endpoints ou teste manualmente seguindo os exemplos acima.
+
+### Testar com Python
+
+```python
+import requests
+
+BASE_URL = "http://127.0.0.1:8000/api"
+
+# Criar projeto
+response = requests.post(f"{BASE_URL}/projects/", json={
+    "name": "Teste Motor",
+    "description": "Projeto de teste"
+})
+project_id = response.json()['id']
+
+# Upload arquivo
+with open('motor_ligado.txt', 'rb') as f:
+    files = {'file': f}
+    data = {
+        'delimiter': ';',
+        'target_label': 'ligado'
+    }
+    response = requests.post(
+        f"{BASE_URL}/projects/{project_id}/upload/",
+        files=files,
+        data=data
+    )
+
+print(response.json())
+```
+
+---
+
+## 📝 Notas Importantes
+
+### Limites de Upload
+- Tamanho máximo por arquivo: 100 MB
+- Configurável em `settings.py`: `FILE_UPLOAD_MAX_MEMORY_SIZE`
+
+### Formatos Suportados
+- **CSV**: Delimitadores: `,` `;` `\t` `|`
+- **TXT**: Parser genérico com detecção de estrutura
+
+### Performance
+- Treinamento é síncrono (implementação assíncrona com Celery está planejada)
+- Para datasets grandes, considere reduzir epochs ou batch_size
+
+---
+
+## 🛠️ Troubleshooting
+
+### Erro ao processar arquivo
+- Verifique o delimitador correto
+- Certifique-se que o arquivo não está vazio
+- Verifique encoding (UTF-8)
+
+### Erro no treinamento
+- Verifique se as colunas especificadas existem no dataset
+- Certifique-se que há dados suficientes (mínimo ~100 amostras)
+- Verifique se a coluna target está correta
+
+### Modelo muito grande
+- Use quantização (já habilitada por padrão)
+- Reduza número de camadas ou filtros (futuro: configurável)
+
+---
+
+## 🎯 Próximas Funcionalidades (Roadmap)
+
+- [ ] Treinamento assíncrono com Celery
+- [ ] WebSocket para updates em tempo real
+- [ ] Configuração de arquitetura do modelo via API
+- [ ] Suporte a mais algoritmos (Random Forest, XGBoost)
+- [ ] Visualização de gráficos de treino
+- [ ] Validação cruzada
+- [ ] Grid search de hiperparâmetros
+- [ ] API de inferência (predict)
+- [ ] Autenticação JWT
+- [ ] Rate limiting
+
+
