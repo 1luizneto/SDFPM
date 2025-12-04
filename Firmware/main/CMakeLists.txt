@@ -2,7 +2,8 @@ idf_component_register(
     SRCS 
         "src/main.c" 
         "src/mpu6500.c" 
-        "src/motor_tinyml.cpp"                    
+        "src/motor_tinyml.cpp"
+        "src/bmi160.c"                    
     INCLUDE_DIRS 
         "inc"
     REQUIRES 

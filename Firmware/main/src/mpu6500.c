@@ -45,7 +45,7 @@ esp_err_t MPU6500_Setup(void)
         return status;
     }
 
-    if (check == 0x70 || check == 0x68)
+    if (check == 0x70 || check == 0x68 || check == 0xC8)
     {
         ESP_LOGI(TAG, "MPU6500 detectado com sucesso! WHO_AM_I: 0x%02X", check);
 
@@ -211,15 +211,8 @@ esp_err_t MPU_SetSmaplingRate(void)
 
 esp_err_t MPU_Init(void)
 {
-    esp_err_t err = i2c_master_init();
-    if (err != ESP_OK)
-    {
-        ESP_LOGE(TAG, "Falha na inicialização do I2C: %s", esp_err_to_name(err));
-        return err;
-    }
-    ESP_LOGI(TAG, "I2C inicializado com sucesso!");
 
-    err = MPU6500_Setup();
+    esp_err_t err = MPU6500_Setup();
     if (err != ESP_OK)
     {
         ESP_LOGE(TAG, "Falha ao acordar o MPU6500: %s", esp_err_to_name(err));

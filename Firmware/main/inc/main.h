@@ -12,6 +12,7 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "mpu6500.h"
+#include "bmi160.h"
 
 #define Delay_ms vTaskDelay
 #define tempo pdMS_TO_TICKS
