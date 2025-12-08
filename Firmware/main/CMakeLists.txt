@@ -3,11 +3,17 @@ idf_component_register(
         "src/main.c" 
         "src/mpu6500.c" 
         "src/motor_tinyml.cpp"
-        "src/bmi160.c"                    
+        "src/bmi160.c"
+        "src/wifi.c"                    
     INCLUDE_DIRS 
         "inc"
     REQUIRES 
         esp-tflite-micro
         driver
-        esp_adc
+        esp_wifi
+        nvs_flash
+        esp_http_client
+        esp_event
+        freertos
+        log
         )
