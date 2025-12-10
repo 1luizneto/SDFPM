@@ -36,6 +36,7 @@ typedef struct { float x; float y; float z; } SensorOffsets_t;
 SensorOffsets_t OFFSETS_MPU6050 = {150.0f, -940.0f, -1014.0f};
 SensorOffsets_t OFFSETS_BMI160  = {850.0f, -610.0f, -374.0f};
 SensorOffsets_t *current_offsets = NULL;
+int count_print = 0;
 
 // --- Estrutura para Compartilhar Dados entre Tasks ---
 typedef struct {
@@ -43,6 +44,7 @@ typedef struct {
     int16_t y;
     int16_t z;
     float rpm;
+    bool is_fault; // <--- ADICIONE ESTE CAMPO
 } SystemData_t;
 
 // --- Globais e Handles ---
@@ -280,25 +282,102 @@ void task_processing(void *pvParameters)
                 }
                 last_calc_time = now;
 
-                // --- ATUALIZAÇÃO SEGURA DOS DADOS COMPARTILHADOS ---
+                if (rpm <= 1000) rpm = 0;
+
+                // --- 3. PREPARAÇÃO E INFERÊNCIA ---
+                
+                // A. Aplica Offsets (Isso continua aqui pois depende do sensor físico)
+                float fx = (float)ax - current_offsets->x;
+                float fy = (float)ay - current_offsets->y;
+                float fz = (float)az - current_offsets->z;
+
+                // B. Executa IA
+                // Nota: Passamos fx, fy, fz, rpm. A normalização (Scaler) agora ocorre dentro da função!
+                MotorFaultDetector_AddSample(fx, fy, fz, rpm);
+                
+                float conf[5]; // Mudado para 5 classes
+                int class_idx = MotorFaultDetector_Predict(conf);
+                
+                // C. Classificação de Falha (5 Classes)
+                bool is_fault = false;
+                
+                // Verifica contra o novo ENUM
+                if (class_idx == CLASS_FALHA_1 || class_idx == CLASS_FALHA_2 || class_idx == CLASS_FALHA_3) { 
+                    is_fault = true;
+                }
+
+                // D. Atualiza LEDs
+                if (is_fault) {
+                    gpio_set_level(LED_SEM_FALHA, 0);
+                    gpio_set_level(LED_COM_FALHA, 1); // Vermelho
+                } else {
+                    gpio_set_level(LED_SEM_FALHA, 1); // Verde
+                    gpio_set_level(LED_COM_FALHA, 0);
+                }
+
+                // Log de Debug
+
+                printf("X=%.0f | Y=%.0f | Z=%.0f | RPM=%.2f\n", fx, fy, fz, rpm);
+
+                // Ajuste os nomes conforme a ordem real do seu treinamento!
+                const char* class_names[] = {"OFF", "FALHA 1", "FALHA 2", "FALHA 3", "NORMAL"}; 
+                
+                /*
+
+                // --- LÓGICA DE VOTAÇÃO (BUFFER DE 10) ---
+                static int pred_buffer[10]; // Buffer estático para guardar o histórico
+                
+                // Guarda a predição atual no buffer
+                if (count_print < 10) {
+                    pred_buffer[count_print] = class_idx;
+                }
+                count_print++;
+                
+                if(count_print >= 10) {
+                    // 1. Contabiliza os votos
+                    int votos[5] = {0}; // Zera contadores para as 5 classes
+                    for(int i=0; i<10; i++) {
+                        if(pred_buffer[i] >= 0 && pred_buffer[i] < 5) {
+                            votos[pred_buffer[i]]++;
+                        }
+                    }
+
+                    // 2. Descobre o vencedor (Moda)
+                    int winner_idx = 0;
+                    int max_votos = 0;
+                    for(int i=0; i<5; i++) {
+                        if(votos[i] > max_votos) {
+                            max_votos = votos[i];
+                            winner_idx = i;
+                        }
+                    }
+
+                    if (winner_idx == 1 && max_votos <= 5) {
+                        winner_idx = 4; // 4 é o índice de CLASS_NORMAL
+                        max_votos = 0;  
+                    }
+
+                    // 3. Printa a classe vencedora e a "confiança" baseada nos votos (ex: 8/10 = 80%)
+                    printf("Sensor: %s | IA (Moda 10): %s (Votos: %d/10) | RPM: %.0f\n", 
+                           (current_offsets == &OFFSETS_MPU6050) ? "MPU" : "BMI", 
+                           class_names[winner_idx], 
+                           max_votos, 
+                           rpm);
+                           
+                    count_print = 0;
+                }
+                */
+
+
+                // --- 4. ATUALIZAÇÃO DOS DADOS GLOBAIS ---
                 if (xSemaphoreTake(xDataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
                     g_latest_data.x = ax;
                     g_latest_data.y = ay;
                     g_latest_data.z = az;
                     g_latest_data.rpm = rpm;
+                    g_latest_data.is_fault = is_fault;
                     xSemaphoreGive(xDataMutex);
                 }
-
-                if (rpm <= 1000) rpm = 0;
-                printf("DADOS: X=%d | Y=%d | Z=%d | RPM=%.2f\n", ax, ay, az, rpm);
-
-                // Feedback visual simples
-                gpio_set_level(LED_SEM_FALHA, 1);
-
-                /* IA DESATIVADA TEMPORARIAMENTE
-                   MotorFaultDetector_AddSample(...)
-                   MotorFaultDetector_Predict(...)
-                */
             }
             
             vTaskDelay(pdMS_TO_TICKS(100)); 
@@ -361,6 +440,8 @@ void app_main(void)
 {
     // Hardware Init
     ESP_ERROR_CHECK(i2c_bus_init());
+
+    ESP_ERROR_CHECK(MotorFaultDetector_Init());
     
     // Cria Mutexes
     xI2CMutex = xSemaphoreCreateMutex();
@@ -390,7 +471,9 @@ void app_main(void)
     
     // 4. Telemetria: Envia dados para o PC a 1Hz
     // Stack maior (8192) pois HTTP/TLS consome muita memória
-    xTaskCreate(task_telemetry, "Telemetry", 8192, NULL, 4, NULL);
+
+    //COMENTADO PARA GRAVAR OS DADOS LOCALMENTE
+    //xTaskCreate(task_telemetry, "Telemetry", 8192, NULL, 4, NULL);
 
     ESP_LOGI(TAG, "Sistema Completo Iniciado: Motor + Encoder + Wi-Fi Telemetria");
 }

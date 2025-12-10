@@ -1,6 +1,6 @@
 #include "motor_tinyml.h"
-#include "model_data_v1.h"
-#include "model_data_v2.h"
+#include "model_data_v5.h" // MODELO 5 CATEGORIAS SEM OFFSET
+#include "model_data_v11.h"
 #include "tensorflow/lite/micro/micro_interpreter.h"
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"  
 #include "tensorflow/lite/schema/schema_generated.h"
@@ -9,6 +9,21 @@
 #include "esp_log.h"
 
 static const char *TAG = "FAULT_DETECTOR";
+
+const float SCALER_MEAN[4] = {
+    -15447.999736f,  // X
+    -60.140699f,  // Y
+    5683.202441f,  // Z
+    16032.835092f,  // RPM
+};
+
+// Desvios padrão de cada feature calculadas durante o treinamento
+const float SCALER_SCALE[4] = {
+    178.432483f,  // X
+    339.758136f,  // Y
+    1150.414498f,  // Z
+    7993.591800f,  // RPM
+};
 
 // Buffer para o TensorFlow Lite (aumentado para suportar todas as ops)
 constexpr int kTensorArenaSize = 80 * 1024; // 80KB
@@ -21,7 +36,7 @@ static TfLiteTensor *input = nullptr;
 static TfLiteTensor *output = nullptr;
 
 // Buffer circular para armazenar amostras
-static float sample_buffer[WINDOW_SIZE * 4]; // X, Y, Z, corrente
+static float sample_buffer[ 4]; // X, Y, Z, corrente
 static int sample_count = 0;
 
 // static float mean_x = 0.0f;
@@ -34,7 +49,7 @@ static int sample_count = 0;
 esp_err_t MotorFaultDetector_Init(void)
 {
     // 1. Carrega o modelo
-    model = tflite::GetModel(motor_v2_tflite);
+    model = tflite::GetModel(motor_v11_tflite);
     if (model->version() != TFLITE_SCHEMA_VERSION)
     {
         ESP_LOGE(TAG, "Versão do modelo incompatível!");
@@ -110,87 +125,79 @@ esp_err_t MotorFaultDetector_Init(void)
     return ESP_OK;
 }
 
-void MotorFaultDetector_AddSample(float accel_x, float accel_y, float accel_z, float current_adc)
+void MotorFaultDetector_AddSample(float accel_x, float accel_y, float accel_z, float rpm)
 {
     // Armazena os 4 valores no buffer
     sample_buffer[0] = accel_x;
     sample_buffer[1] = accel_y;
     sample_buffer[2] = accel_z;
-    sample_buffer[3] = current_adc; // Novo valor de corrente
+    sample_buffer[3] = rpm; // Novo valor de rpm
 
     sample_count = 1;
 }
 
-motor_status_t MotorFaultDetector_Predict(float confidence[2])
+motor_class_t MotorFaultDetector_Predict(float *confidence_array)
 {
-    // Inicializa com valores padrão
-    confidence[0] = 0.0f; // Probabilidade de Falha
-    confidence[1] = 0.0f; // Probabilidade de Ligado/Normal
+    // [ERRO ANTERIOR]: O sample_count < 1 sugeria buffer de tempo. 
+    // Para o modelo novo, basta ter 1 leitura válida.
 
-    if (sample_count < 1)
-    {
-        return MOTOR_STATUS_FAULT; // Retorna um padrão seguro se não houver amostras
+    // 1. NORMALIZAÇÃO (Essencial!)
+    // Variável temporária para guardar dados normalizados
+    float input_data_normalized[4];
+    
+    // Supondo que sample_buffer tenha {X, Y, Z, RPM} brutos
+    for(int i=0; i<4; i++) {
+        input_data_normalized[i] = (sample_buffer[i] - SCALER_MEAN[i]) / SCALER_SCALE[i];
     }
 
-    // Copia dados para o tensor de entrada (lógica inalterada)
+    // 2. PREENCHIMENTO DO TENSOR (Com dados normalizados)
     if (input->type == kTfLiteInt8) {
         float scale = input->params.scale;
         int zero_point = input->params.zero_point;
         for (int i = 0; i < 4; i++) {
-            input->data.int8[i] = (int8_t)((sample_buffer[i] / scale) + zero_point);
+            // Quantiza o dado JÁ normalizado
+            input->data.int8[i] = (int8_t)((input_data_normalized[i] / scale) + zero_point);
         }
     } else {
         for (int i = 0; i < 4; i++) {
-            input->data.f[i] = sample_buffer[i];
+            input->data.f[i] = input_data_normalized[i];
         }
     }
 
-    // Executa inferência
-    if (interpreter->Invoke() != kTfLiteOk)
-    {
+    // 3. INFERÊNCIA
+    if (interpreter->Invoke() != kTfLiteOk) {
         ESP_LOGE(TAG, "Falha na inferência!");
-        return MOTOR_STATUS_FAULT; // Retorna um padrão seguro em caso de erro
+        return CLASS_DESLIGADO;
     }
 
-    // Lê os resultados do modelo (agora com 2 saídas)
-    float prob_fault = 0.0f;
-    float prob_on = 0.0f;
+    // 4. PROCESSAMENTO DA SAÍDA (Correção do Double Softmax)
+    float max_score = -1.0f; // Probabilidade nunca é negativa
+    int max_index = 0;
 
-    if (output->type == kTfLiteInt8) {
-        // Modelo quantizado
-        float scale = output->params.scale;
-        int zero_point = output->params.zero_point;
+    for (int i = 0; i < NUM_CLASSES; i++) {
+        float val;
         
-        // Saída 0: Defeito
-        prob_fault = (output->data.int8[0] - zero_point) * scale;
-        // Saída 1: Ligado
-        prob_on = (output->data.int8[1] - zero_point) * scale;
+        // Se a saída for INT8, desquantiza para Float
+        if (output->type == kTfLiteInt8) {
+            float scale = output->params.scale;
+            int zero_point = output->params.zero_point;
+            val = (output->data.int8[i] - zero_point) * scale;
+        } else {
+            // Se for Float (seu caso atual), pega direto
+            val = output->data.f[i];
+        }
 
-    } else {
-        // Modelo float32
-        // Saída 0: Defeito
-        prob_fault = output->data.f[0];
-        // Saída 1: Ligado
-        prob_on = output->data.f[1];
+        // --- CORREÇÃO AQUI ---
+        // NÃO aplicamos expf() nem dividimos pela soma.
+        // O modelo TFLite já entrega a probabilidade pronta (Softmax já rodou na rede).
+        
+        confidence_array[i] = val; // O valor JÁ É a % (ex: 0.99)
+
+        if (confidence_array[i] > max_score) {
+            max_score = confidence_array[i];
+            max_index = i;
+        }
     }
 
-    // Aplicar softmax para normalizar as probabilidades (garantir que somem 1)
-    // Se o seu modelo já tiver uma camada Softmax no final, esta etapa pode ser removida.
-    // Mas é seguro mantê-la se os valores de saída forem "logits" brutos.
-    float sum = expf(prob_fault) + expf(prob_on);
-    prob_fault = expf(prob_fault) / sum;
-    prob_on = expf(prob_on) / sum;
-
-    // Armazena as probabilidades no array de saída
-    confidence[0] = prob_fault;
-    confidence[1] = prob_on;
-
-    //ESP_LOGI(TAG, "Probabilidades - FALHA: %.4f, LIGADO: %.4f", prob_fault, prob_on);
-
-    // Retorna a classe com maior probabilidade
-    if (prob_fault > prob_on) {
-        return MOTOR_STATUS_FAULT;
-    } else {
-        return MOTOR_STATUS_ON;
-    }
+    return (motor_class_t)max_index;
 }

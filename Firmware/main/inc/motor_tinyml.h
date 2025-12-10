@@ -7,38 +7,28 @@
 extern "C" {
 #endif
 
-#define WINDOW_SIZE 1  // Tamanho da janela de dados para inferência
-
-// Enumeração atualizada para os dois novos status
+// ATENÇÃO: A ordem aqui deve ser A MESMA do seu treinamento (labels.txt)
 typedef enum {
-    MOTOR_STATUS_FAULT = 0,      // Motor com defeito (correspondendo à saída 0 do modelo)
-    MOTOR_STATUS_ON = 1          // Motor ligado e funcionando normal (correspondendo à saída 1)
-} motor_status_t;
+    CLASS_DESLIGADO = 0,
+    CLASS_FALHA_1,   // ex: Bloqueio
+    CLASS_FALHA_2,   // ex: Desbalanceamento
+    CLASS_FALHA_3,   // ex: Rolamento
+    CLASS_NORMAL     // ex: Ligado Normal
+} motor_class_t;
 
-/**
- * @brief Inicializa o detector de falhas do motor
- * @return ESP_OK em sucesso, ESP_FAIL em falha
- */
+extern const float SCALER_MEAN[4];
+extern const float SCALER_SCALE[4];
+
+#define NUM_CLASSES 5
+
 esp_err_t MotorFaultDetector_Init(void);
+void MotorFaultDetector_AddSample(float accel_x, float accel_y, float accel_z, float rpm);
 
-/**
- * @brief Adiciona uma amostra (3 eixos de aceleração + corrente) ao buffer.
- * @param accel_x Aceleração no eixo X (em g)
- * @param accel_y Aceleração no eixo Y (em g)
- * @param accel_z Aceleração no eixo Z (em g)
- * @param current_adc Valor bruto lido do ADC para o sensor de corrente.
- */
-void MotorFaultDetector_AddSample(float accel_x, float accel_y, float accel_z, float current_adc); // ATUALIZADO
-
-/**
- * @brief Executa a predição de falha
- * @param confidence Array para armazenar as 2 probabilidades [FAULT, ON]
- * @return Status do motor (MOTOR_STATUS_FAULT ou MOTOR_STATUS_ON)
- */
-motor_status_t MotorFaultDetector_Predict(float confidence[2]); // Atualizado para 2 posições
+// Agora retorna o índice da classe vencedora e preenche o array de confianças
+motor_class_t MotorFaultDetector_Predict(float *confidence_array);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // MOTOR_TINYML_H
+#endif
