@@ -1,6 +1,7 @@
 #include "motor_tinyml.h"
 #include "model_data_v5.h" // MODELO 5 CATEGORIAS SEM OFFSET
 #include "model_data_v11.h"
+#include "model_data_v12.h"
 #include "tensorflow/lite/micro/micro_interpreter.h"
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"  
 #include "tensorflow/lite/schema/schema_generated.h"
@@ -11,18 +12,18 @@
 static const char *TAG = "FAULT_DETECTOR";
 
 const float SCALER_MEAN[4] = {
-    -15447.999736f,  // X
-    -60.140699f,  // Y
-    5683.202441f,  // Z
-    16032.835092f,  // RPM
+    -14651.008128f,  // X
+    -50.763613f,  // Y
+    7589.043379f,  // Z
+    16151.276905f,  // RPM
 };
 
 // Desvios padrão de cada feature calculadas durante o treinamento
 const float SCALER_SCALE[4] = {
-    178.432483f,  // X
-    339.758136f,  // Y
-    1150.414498f,  // Z
-    7993.591800f,  // RPM
+    190.850926f,  // X
+    329.144817f,  // Y
+    1131.521688f,  // Z
+    8061.598235f,  // RPM
 };
 
 // Buffer para o TensorFlow Lite (aumentado para suportar todas as ops)
@@ -49,7 +50,7 @@ static int sample_count = 0;
 esp_err_t MotorFaultDetector_Init(void)
 {
     // 1. Carrega o modelo
-    model = tflite::GetModel(motor_v11_tflite);
+    model = tflite::GetModel(motor_v12_tflite);
     if (model->version() != TFLITE_SCHEMA_VERSION)
     {
         ESP_LOGE(TAG, "Versão do modelo incompatível!");

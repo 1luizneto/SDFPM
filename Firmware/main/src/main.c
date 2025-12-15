@@ -317,12 +317,10 @@ void task_processing(void *pvParameters)
 
                 // Log de Debug
 
-                printf("X=%.0f | Y=%.0f | Z=%.0f | RPM=%.2f\n", fx, fy, fz, rpm);
+                //printf("X=%.0f | Y=%.0f | Z=%.0f | RPM=%.2f\n", fx, fy, fz, rpm);
 
                 // Ajuste os nomes conforme a ordem real do seu treinamento!
                 const char* class_names[] = {"OFF", "FALHA 1", "FALHA 2", "FALHA 3", "NORMAL"}; 
-                
-                /*
 
                 // --- LÓGICA DE VOTAÇÃO (BUFFER DE 10) ---
                 static int pred_buffer[10]; // Buffer estático para guardar o histórico
@@ -352,8 +350,8 @@ void task_processing(void *pvParameters)
                         }
                     }
 
-                    if (winner_idx == 1 && max_votos <= 5) {
-                        winner_idx = 4; // 4 é o índice de CLASS_NORMAL
+                    if (winner_idx == 4 && max_votos <= 6) {
+                        winner_idx = 2; // 2 é o índice de CLASS_FALHA_2
                         max_votos = 0;  
                     }
 
@@ -366,7 +364,6 @@ void task_processing(void *pvParameters)
                            
                     count_print = 0;
                 }
-                */
 
 
                 // --- 4. ATUALIZAÇÃO DOS DADOS GLOBAIS ---
