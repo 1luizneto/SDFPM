@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  # 1. O Banco de Dados
+  db:
+    image: postgres:15
+    container_name: motores_db
+    environment:
+      - POSTGRES_DB=motores_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # 2. O Backend (Django)
+  backend:
+    build: ./backend
+    container_name: motores_backend
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./backend:/app # Isso permite editar código e atualizar sem reiniciar o docker
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db # Só inicia depois que o banco subir
+
+  # 3. O Frontend (React)
+  frontend:
+    build: ./frontend
+    container_name: motores_frontend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules # Evita apagar a pasta node_modules do container
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend # Só inicia depois do backend
+
+volumes:
+  postgres_data:
