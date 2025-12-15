@@ -324,6 +324,13 @@ void task_processing(void *pvParameters)
                 float fy = (float)ay - current_offsets->y;
                 float fz = (float)az - current_offsets->z;
 
+                if (current_offsets == &OFFSETS_BMI160)
+                {
+                    // Ajuste específico para BMI160 para coincidir com o MPU6500
+                    fx = -1.1473f * fx + 2950.01f;
+                    fy = -1.4682f * fy + 682.63f;
+                    fz = 0.9532f * fz + 2576.39f;
+                }
                 // B. Executa IA
                 // Nota: Passamos fx, fy, fz, rpm. A normalização (Scaler) agora ocorre dentro da função!
                 MotorFaultDetector_AddSample(fx, fy, fz, rpm);
@@ -393,13 +400,13 @@ void task_processing(void *pvParameters)
                         }
                     }
 
-                    if (winner_idx == 4 && max_votos <= 6)
+                    if (winner_idx == 4 && max_votos <= 7)
                     {
                         winner_idx = 2; // 2 é o índice de CLASS_FALHA_2
                         max_votos = 0;
                     }
 
-                    // 3. Printa a classe vencedora e a "confiança" baseada nos votos (ex: 8/10 = 80%)
+                   // 3. Printa a classe vencedora e a "confiança" baseada nos votos (ex: 8/10 = 80%)
                     printf("Sensor: %s | IA (Moda 10): %s (Votos: %d/10) | RPM: %.0f\n",
                            (current_offsets == &OFFSETS_MPU6050) ? "MPU" : "BMI",
                            class_names[winner_idx],
