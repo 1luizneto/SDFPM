@@ -10,7 +10,7 @@
 #define WIFI_PASS "w1f1:Assert!!"
 
 // IP do seu computador e a rota da API
-#define WEB_SERVER_URL "http://192.168.10.170:8000/api/leituras/registrar/"
+#define WEB_SERVER_URL "http://192.168.10.179:8000/api/leituras/registrar/"
 
 // ID do Hardware fixo
 #define HARDWARE_UID "ESP32-S3-002"
@@ -34,9 +34,9 @@ bool wifi_app_check_connection(void);
  * @param y Valor bruto do eixo Y
  * @param z Valor bruto do eixo Z
  * @param rpm Valor calculado de RPM
- * @param em_falha Status booleano de falha
+ * @param status Valor de 0 a 4 indicando o diagnóstico (0=Normal, etc)
  * @return esp_err_t ESP_OK se enviou (200 OK), erro caso contrário
  */
-esp_err_t wifi_send_telemetry(int16_t x, int16_t y, int16_t z, float rpm, bool em_falha);
+esp_err_t wifi_send_telemetry(int16_t x, int16_t y, int16_t z, float rpm, int status);
 
 #endif

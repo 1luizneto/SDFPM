@@ -1,6 +1,5 @@
 #include "main.h"
 #include "motor_tinyml.h"
-// #include "esp_adc/adc_oneshot.h" // ADC Removido
 #include "driver/gpio.h"
 #include "driver/i2c.h"
 #include "freertos/FreeRTOS.h"
@@ -14,32 +13,38 @@
 static const char *TAG = "DATA_COLLECTOR";
 
 // --- Configuração dos Pinos ---
-#define RELE_PIN            GPIO_NUM_10
-#define BOTAO_PIN           GPIO_NUM_7
-#define LED_SEM_FALHA       GPIO_NUM_6
-#define LED_COM_FALHA       GPIO_NUM_4
+#define RELE_PIN GPIO_NUM_10
+#define BOTAO_PIN GPIO_NUM_7
+#define LED_SEM_FALHA GPIO_NUM_6
+#define LED_COM_FALHA GPIO_NUM_4
 
 // --- Configuração do Encoder ---
-#define ENCODER_PIN         GPIO_NUM_5   // Verifique seu hardware
-#define ENCODER_PPR         20           // Pulsos por revolução
+#define ENCODER_PIN GPIO_NUM_5 // Verifique seu hardware
+#define ENCODER_PPR 20         // Pulsos por revolução
 
 // --- Configuração I2C Geral ---
-#define I2C_MASTER_SCL_IO   9
-#define I2C_MASTER_SDA_IO   8
-#define I2C_MASTER_NUM      I2C_NUM_0
-#define I2C_MASTER_FREQ_HZ  100000
+#define I2C_MASTER_SCL_IO 9
+#define I2C_MASTER_SDA_IO 8
+#define I2C_MASTER_NUM I2C_NUM_0
+#define I2C_MASTER_FREQ_HZ 100000
 
-#define DEBOUNCE_TIME_MS    50
+#define DEBOUNCE_TIME_MS 50
 
 // --- Offsets ---
-typedef struct { float x; float y; float z; } SensorOffsets_t;
+typedef struct
+{
+    float x;
+    float y;
+    float z;
+} SensorOffsets_t;
 SensorOffsets_t OFFSETS_MPU6050 = {150.0f, -940.0f, -1014.0f};
-SensorOffsets_t OFFSETS_BMI160  = {850.0f, -610.0f, -374.0f};
+SensorOffsets_t OFFSETS_BMI160 = {850.0f, -610.0f, -374.0f};
 SensorOffsets_t *current_offsets = NULL;
 int count_print = 0;
 
 // --- Estrutura para Compartilhar Dados entre Tasks ---
-typedef struct {
+typedef struct
+{
     int16_t x;
     int16_t y;
     int16_t z;
@@ -51,6 +56,7 @@ typedef struct {
 static bool g_user_request_motor = false;
 static bool g_sensor_is_valid = false;
 static uint8_t g_current_sensor_addr = 0;
+static int g_winner_idx = 0;
 
 // Variáveis do Encoder (Volatile para Interrupção)
 static volatile uint32_t g_pulse_count = 0;
@@ -66,7 +72,7 @@ SystemData_t g_latest_data = {0};
 // ==========================================================
 //    INTERRUPÇÃO DO ENCODER
 // ==========================================================
-static void IRAM_ATTR encoder_isr_handler(void* arg)
+static void IRAM_ATTR encoder_isr_handler(void *arg)
 {
     portENTER_CRITICAL_ISR(&encoder_mux);
     g_pulse_count++;
@@ -83,7 +89,7 @@ static void encoder_init(void)
     gpio_config(&io_conf);
 
     gpio_install_isr_service(0);
-    gpio_isr_handler_add(ENCODER_PIN, encoder_isr_handler, (void*) ENCODER_PIN);
+    gpio_isr_handler_add(ENCODER_PIN, encoder_isr_handler, (void *)ENCODER_PIN);
 }
 
 // ==========================================================
@@ -105,14 +111,16 @@ static esp_err_t i2c_bus_init(void)
 
 uint8_t i2c_scan_bus(void)
 {
-    for (uint8_t i = 1; i < 127; i++) {
+    for (uint8_t i = 1; i < 127; i++)
+    {
         i2c_cmd_handle_t cmd = i2c_cmd_link_create();
         i2c_master_start(cmd);
         i2c_master_write_byte(cmd, (i << 1) | I2C_MASTER_WRITE, true);
         i2c_master_stop(cmd);
         esp_err_t res = i2c_master_cmd_begin(I2C_MASTER_NUM, cmd, pdMS_TO_TICKS(20));
         i2c_cmd_link_delete(cmd);
-        if (res == ESP_OK) return i;
+        if (res == ESP_OK)
+            return i;
     }
     return 0;
 }
@@ -139,7 +147,8 @@ void task_sensor_monitor(void *pvParameters)
         {
             if (g_sensor_is_valid)
             {
-                if (!check_sensor_health(g_current_sensor_addr)) {
+                if (!check_sensor_health(g_current_sensor_addr))
+                {
                     ESP_LOGE(TAG, "SENSOR DESCONECTADO!");
                     g_sensor_is_valid = false;
                     g_current_sensor_addr = 0;
@@ -149,31 +158,38 @@ void task_sensor_monitor(void *pvParameters)
             else
             {
                 uint8_t addr = i2c_scan_bus();
-                if (addr != 0) {
+                if (addr != 0)
+                {
                     ESP_LOGI(TAG, "Sensor detectado em 0x%02X", addr);
                     uint8_t who_am_i = 0;
                     uint8_t reg_check = 0x75;
                     i2c_master_write_read_device(I2C_MASTER_NUM, addr, &reg_check, 1, &who_am_i, 1, pdMS_TO_TICKS(100));
 
                     bool identified = false;
-                    if (who_am_i == 0x68 || who_am_i == 0x70) {
-                        if (MPU_Init() == ESP_OK) {
+                    if (who_am_i == 0x68 || who_am_i == 0x70)
+                    {
+                        if (MPU_Init() == ESP_OK)
+                        {
                             current_offsets = &OFFSETS_MPU6050;
                             identified = true;
                         }
                     }
-                    else {
+                    else
+                    {
                         reg_check = 0x00;
                         i2c_master_write_read_device(I2C_MASTER_NUM, addr, &reg_check, 1, &who_am_i, 1, pdMS_TO_TICKS(100));
-                        if (who_am_i == 0xD1) {
-                            if (BMI160_Init() == ESP_OK) {
+                        if (who_am_i == 0xD1)
+                        {
+                            if (BMI160_Init() == ESP_OK)
+                            {
                                 current_offsets = &OFFSETS_BMI160;
                                 identified = true;
                             }
                         }
                     }
 
-                    if (identified) {
+                    if (identified)
+                    {
                         g_current_sensor_addr = addr;
                         g_sensor_is_valid = true;
                         ESP_LOGI(TAG, "Sensor Configurado OK!");
@@ -204,33 +220,43 @@ void task_ui_control(void *pvParameters)
             if ((now - last_press) > DEBOUNCE_TIME_MS)
             {
                 last_press = now;
-                if (g_sensor_is_valid) {
+                if (g_sensor_is_valid)
+                {
                     g_user_request_motor = !g_user_request_motor;
                     ESP_LOGI(TAG, "Botao -> Motor: %d", g_user_request_motor);
-                } else {
-                    for(int k=0; k<3; k++){
-                        gpio_set_level(LED_SEM_FALHA, 1); gpio_set_level(LED_COM_FALHA, 1);
+                }
+                else
+                {
+                    for (int k = 0; k < 3; k++)
+                    {
+                        gpio_set_level(LED_SEM_FALHA, 1);
+                        gpio_set_level(LED_COM_FALHA, 1);
                         vTaskDelay(pdMS_TO_TICKS(100));
-                        gpio_set_level(LED_SEM_FALHA, 0); gpio_set_level(LED_COM_FALHA, 0);
+                        gpio_set_level(LED_SEM_FALHA, 0);
+                        gpio_set_level(LED_COM_FALHA, 0);
                         vTaskDelay(pdMS_TO_TICKS(100));
                     }
                 }
             }
-            while (gpio_get_level(BOTAO_PIN) == 0) vTaskDelay(pdMS_TO_TICKS(20));
+            while (gpio_get_level(BOTAO_PIN) == 0)
+                vTaskDelay(pdMS_TO_TICKS(20));
         }
 
         bool should_motor_be_on = g_user_request_motor && g_sensor_is_valid;
 
-        if (g_user_request_motor && !g_sensor_is_valid) {
+        if (g_user_request_motor && !g_sensor_is_valid)
+        {
             g_user_request_motor = false;
             should_motor_be_on = false;
         }
 
-        if (should_motor_be_on != last_relay_state) {
+        if (should_motor_be_on != last_relay_state)
+        {
             gpio_set_level(RELE_PIN, should_motor_be_on);
             last_relay_state = should_motor_be_on;
-            
-            if(!should_motor_be_on) {
+
+            if (!should_motor_be_on)
+            {
                 gpio_set_level(LED_SEM_FALHA, 0);
                 gpio_set_level(LED_COM_FALHA, 0);
             }
@@ -249,6 +275,7 @@ void task_processing(void *pvParameters)
     uint32_t last_calc_time = 0;
     uint32_t current_pulses = 0;
     float rpm = 0.0f;
+    int winner_idx = 0;
 
     while (1)
     {
@@ -258,10 +285,14 @@ void task_processing(void *pvParameters)
             uint32_t now = xTaskGetTickCount() * portTICK_PERIOD_MS;
 
             // 1. Ler Acelerômetro
-            if (xSemaphoreTake(xI2CMutex, portMAX_DELAY) == pdTRUE) {
-                if (current_offsets == &OFFSETS_MPU6050) {
+            if (xSemaphoreTake(xI2CMutex, portMAX_DELAY) == pdTRUE)
+            {
+                if (current_offsets == &OFFSETS_MPU6050)
+                {
                     err = MPU_ReadAccelerometer(&ax, &ay, &az);
-                } else if (current_offsets == &OFFSETS_BMI160) {
+                }
+                else if (current_offsets == &OFFSETS_BMI160)
+                {
                     err = BMI160_ReadAccelerometer(&ax, &ay, &az);
                 }
                 xSemaphoreGive(xI2CMutex);
@@ -276,16 +307,18 @@ void task_processing(void *pvParameters)
                 portEXIT_CRITICAL(&encoder_mux);
 
                 uint32_t delta_t = now - last_calc_time;
-                if (delta_t > 0) {
+                if (delta_t > 0)
+                {
                     float revs = (float)current_pulses / (float)ENCODER_PPR;
                     rpm = revs * (60000.0f / (float)delta_t);
                 }
                 last_calc_time = now;
 
-                if (rpm <= 1000) rpm = 0;
+                if (rpm <= 1000)
+                    rpm = 0;
 
                 // --- 3. PREPARAÇÃO E INFERÊNCIA ---
-                
+
                 // A. Aplica Offsets (Isso continua aqui pois depende do sensor físico)
                 float fx = (float)ax - current_offsets->x;
                 float fy = (float)ay - current_offsets->y;
@@ -294,102 +327,118 @@ void task_processing(void *pvParameters)
                 // B. Executa IA
                 // Nota: Passamos fx, fy, fz, rpm. A normalização (Scaler) agora ocorre dentro da função!
                 MotorFaultDetector_AddSample(fx, fy, fz, rpm);
-                
+
                 float conf[5]; // Mudado para 5 classes
                 int class_idx = MotorFaultDetector_Predict(conf);
-                
+
                 // C. Classificação de Falha (5 Classes)
                 bool is_fault = false;
-                
+
                 // Verifica contra o novo ENUM
-                if (class_idx == CLASS_FALHA_1 || class_idx == CLASS_FALHA_2 || class_idx == CLASS_FALHA_3) { 
+                if (class_idx == CLASS_FALHA_1 || class_idx == CLASS_FALHA_2 || class_idx == CLASS_FALHA_3)
+                {
                     is_fault = true;
                 }
 
                 // D. Atualiza LEDs
-                if (is_fault) {
+                if (is_fault)
+                {
                     gpio_set_level(LED_SEM_FALHA, 0);
                     gpio_set_level(LED_COM_FALHA, 1); // Vermelho
-                } else {
+                }
+                else
+                {
                     gpio_set_level(LED_SEM_FALHA, 1); // Verde
                     gpio_set_level(LED_COM_FALHA, 0);
                 }
 
                 // Log de Debug
 
-                //printf("X=%.0f | Y=%.0f | Z=%.0f | RPM=%.2f\n", fx, fy, fz, rpm);
+                // printf("X=%.0f | Y=%.0f | Z=%.0f | RPM=%.2f\n", fx, fy, fz, rpm);
 
                 // Ajuste os nomes conforme a ordem real do seu treinamento!
-                const char* class_names[] = {"OFF", "FALHA 1", "FALHA 2", "FALHA 3", "NORMAL"}; 
+                const char *class_names[] = {"OFF", "FALHA 1", "FALHA 2", "FALHA 3", "NORMAL"};
 
                 // --- LÓGICA DE VOTAÇÃO (BUFFER DE 10) ---
                 static int pred_buffer[10]; // Buffer estático para guardar o histórico
-                
+
                 // Guarda a predição atual no buffer
-                if (count_print < 10) {
+                if (count_print < 10)
+                {
                     pred_buffer[count_print] = class_idx;
                 }
                 count_print++;
-                
-                if(count_print >= 10) {
+
+                if (count_print >= 10)
+                {
                     // 1. Contabiliza os votos
                     int votos[5] = {0}; // Zera contadores para as 5 classes
-                    for(int i=0; i<10; i++) {
-                        if(pred_buffer[i] >= 0 && pred_buffer[i] < 5) {
+                    for (int i = 0; i < 10; i++)
+                    {
+                        if (pred_buffer[i] >= 0 && pred_buffer[i] < 5)
+                        {
                             votos[pred_buffer[i]]++;
                         }
                     }
 
                     // 2. Descobre o vencedor (Moda)
-                    int winner_idx = 0;
+                    winner_idx = 0;
                     int max_votos = 0;
-                    for(int i=0; i<5; i++) {
-                        if(votos[i] > max_votos) {
+                    for (int i = 0; i < 5; i++)
+                    {
+                        if (votos[i] > max_votos)
+                        {
                             max_votos = votos[i];
                             winner_idx = i;
                         }
                     }
 
-                    if (winner_idx == 4 && max_votos <= 6) {
+                    if (winner_idx == 4 && max_votos <= 6)
+                    {
                         winner_idx = 2; // 2 é o índice de CLASS_FALHA_2
-                        max_votos = 0;  
+                        max_votos = 0;
                     }
 
                     // 3. Printa a classe vencedora e a "confiança" baseada nos votos (ex: 8/10 = 80%)
-                    printf("Sensor: %s | IA (Moda 10): %s (Votos: %d/10) | RPM: %.0f\n", 
-                           (current_offsets == &OFFSETS_MPU6050) ? "MPU" : "BMI", 
-                           class_names[winner_idx], 
-                           max_votos, 
+                    printf("Sensor: %s | IA (Moda 10): %s (Votos: %d/10) | RPM: %.0f\n",
+                           (current_offsets == &OFFSETS_MPU6050) ? "MPU" : "BMI",
+                           class_names[winner_idx],
+                           max_votos,
                            rpm);
-                           
+
                     count_print = 0;
                 }
 
-
                 // --- 4. ATUALIZAÇÃO DOS DADOS GLOBAIS ---
-                if (xSemaphoreTake(xDataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                if (xSemaphoreTake(xDataMutex, pdMS_TO_TICKS(10)) == pdTRUE)
+                {
                     g_latest_data.x = ax;
                     g_latest_data.y = ay;
                     g_latest_data.z = az;
                     g_latest_data.rpm = rpm;
                     g_latest_data.is_fault = is_fault;
+                    g_winner_idx = winner_idx;
                     xSemaphoreGive(xDataMutex);
                 }
             }
-            
-            vTaskDelay(pdMS_TO_TICKS(100)); 
+
+            vTaskDelay(pdMS_TO_TICKS(100));
         }
         else
         {
             g_pulse_count = 0;
             last_calc_time = xTaskGetTickCount() * portTICK_PERIOD_MS;
-            
+
             // Zera dados globais se motor desligado
-            if (xSemaphoreTake(xDataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-                g_latest_data.x = 0; g_latest_data.y = 0; g_latest_data.z = 0; g_latest_data.rpm = 0;
+            if (xSemaphoreTake(xDataMutex, pdMS_TO_TICKS(10)) == pdTRUE)
+            {
+                g_latest_data.x = 0;
+                g_latest_data.y = 0;
+                g_latest_data.z = 0;
+                g_latest_data.rpm = 0;
                 xSemaphoreGive(xDataMutex);
             }
-            
+
             vTaskDelay(pdMS_TO_TICKS(200));
         }
     }
@@ -403,6 +452,7 @@ void task_telemetry(void *pvParameters)
 {
     // Espera o Wi-Fi inicializar
     vTaskDelay(pdMS_TO_TICKS(3000));
+    uint8_t enviar_ao_finalizar = 0;
 
     SystemData_t snapshot;
 
@@ -412,22 +462,45 @@ void task_telemetry(void *pvParameters)
         // E se o Wi-Fi estiver conectado
         if (g_user_request_motor && g_sensor_is_valid && wifi_app_check_connection())
         {
+            enviar_ao_finalizar = 1;
             // 1. Copia os dados mais recentes para uma variável local (Snapshot)
             // Isso libera o Mutex rápido para a task de coleta não travar
-            if (xSemaphoreTake(xDataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+            if (xSemaphoreTake(xDataMutex, pdMS_TO_TICKS(50)) == pdTRUE)
+            {
                 snapshot = g_latest_data;
                 xSemaphoreGive(xDataMutex);
-                
+
                 // 2. Envia HTTP (Isso é lento, pode demorar 1-2s)
                 // "false" no final é o campo "em_falha", fixo por enquanto
-                esp_err_t err = wifi_send_telemetry(snapshot.x, snapshot.y, snapshot.z, snapshot.rpm, false);
-                
-                if (err == ESP_OK) {
-                     // printf("Telemetria enviada: RPM %.1f\n", snapshot.rpm);
+                esp_err_t err = wifi_send_telemetry(snapshot.x, snapshot.y, snapshot.z, snapshot.rpm, g_winner_idx);
+
+                if (err == ESP_OK)
+                {
+                    // printf("Telemetria enviada: RPM %.1f\n", snapshot.rpm);
                 }
             }
         }
-        
+        if (enviar_ao_finalizar && !g_user_request_motor)
+        {
+            enviar_ao_finalizar = 0;
+            // 1. Copia os dados mais recentes para uma variável local (Snapshot)
+            // Isso libera o Mutex rápido para a task de coleta não travar
+            if (xSemaphoreTake(xDataMutex, pdMS_TO_TICKS(50)) == pdTRUE)
+            {
+                snapshot = g_latest_data;
+                xSemaphoreGive(xDataMutex);
+
+                // 2. Envia HTTP (Isso é lento, pode demorar 1-2s)
+                // "false" no final é o campo "em_falha", fixo por enquanto
+                esp_err_t err = wifi_send_telemetry(snapshot.x, snapshot.y, snapshot.z, snapshot.rpm, 0);
+
+                if (err == ESP_OK)
+                {
+                    // printf("Telemetria enviada: RPM %.1f\n", snapshot.rpm);
+                }
+            }
+        }
+
         // Intervalo de envio (1 segundo)
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
@@ -439,11 +512,11 @@ void app_main(void)
     ESP_ERROR_CHECK(i2c_bus_init());
 
     ESP_ERROR_CHECK(MotorFaultDetector_Init());
-    
+
     // Cria Mutexes
     xI2CMutex = xSemaphoreCreateMutex();
     xDataMutex = xSemaphoreCreateMutex();
-    
+
     // Configura o Encoder
     encoder_init();
 
@@ -451,26 +524,32 @@ void app_main(void)
     wifi_app_init();
 
     // Configura GPIOs
-    gpio_reset_pin(RELE_PIN); gpio_set_direction(RELE_PIN, GPIO_MODE_OUTPUT); gpio_set_level(RELE_PIN, 0);
-    gpio_reset_pin(LED_COM_FALHA); gpio_set_direction(LED_COM_FALHA, GPIO_MODE_OUTPUT);
-    gpio_reset_pin(LED_SEM_FALHA); gpio_set_direction(LED_SEM_FALHA, GPIO_MODE_OUTPUT);
-    gpio_reset_pin(BOTAO_PIN); gpio_set_direction(BOTAO_PIN, GPIO_MODE_INPUT); gpio_set_pull_mode(BOTAO_PIN, GPIO_PULLUP_ONLY);
+    gpio_reset_pin(RELE_PIN);
+    gpio_set_direction(RELE_PIN, GPIO_MODE_OUTPUT);
+    gpio_set_level(RELE_PIN, 0);
+    gpio_reset_pin(LED_COM_FALHA);
+    gpio_set_direction(LED_COM_FALHA, GPIO_MODE_OUTPUT);
+    gpio_reset_pin(LED_SEM_FALHA);
+    gpio_set_direction(LED_SEM_FALHA, GPIO_MODE_OUTPUT);
+    gpio_reset_pin(BOTAO_PIN);
+    gpio_set_direction(BOTAO_PIN, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(BOTAO_PIN, GPIO_PULLUP_ONLY);
 
     // Tasks
     // 1. UI: Responde ao botão instantaneamente
     xTaskCreate(task_ui_control, "UI", 4096, NULL, 5, NULL);
-    
+
     // 2. Monitor: Garante que I2C está vivo
     xTaskCreate(task_sensor_monitor, "Monitor", 4096, NULL, 6, NULL);
-    
+
     // 3. Coleta: Lê sensores e calcula RPM a 10Hz
     xTaskCreate(task_processing, "DataCollect", 4096, NULL, 5, NULL);
-    
+
     // 4. Telemetria: Envia dados para o PC a 1Hz
     // Stack maior (8192) pois HTTP/TLS consome muita memória
 
-    //COMENTADO PARA GRAVAR OS DADOS LOCALMENTE
-    //xTaskCreate(task_telemetry, "Telemetry", 8192, NULL, 4, NULL);
+    // COMENTADO PARA GRAVAR OS DADOS LOCALMENTE
+    xTaskCreate(task_telemetry, "Telemetry", 8192, NULL, 4, NULL);
 
     ESP_LOGI(TAG, "Sistema Completo Iniciado: Motor + Encoder + Wi-Fi Telemetria");
 }

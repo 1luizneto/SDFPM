@@ -16,7 +16,6 @@ static const char *TAG = "WIFI_APP";
 static EventGroupHandle_t s_wifi_event_group;
 #define WIFI_CONNECTED_BIT BIT0
 
-// Contador de tentativas (apenas para log)
 static int s_retry_num = 0;
 
 // ==========================================================
@@ -31,7 +30,6 @@ static void event_handler(void *arg, esp_event_base_t event_base,
     }
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
     {
-        // Se cair, limpa o bit de conectado e tenta de novo
         xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
         esp_wifi_connect();
         s_retry_num++;
@@ -42,7 +40,6 @@ static void event_handler(void *arg, esp_event_base_t event_base,
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
         ESP_LOGI(TAG, "Conectado! IP: " IPSTR, IP2STR(&event->ip_info.ip));
         s_retry_num = 0;
-        // Seta o bit indicando que podemos enviar dados
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
     }
 }
@@ -52,7 +49,6 @@ static void event_handler(void *arg, esp_event_base_t event_base,
 // ==========================================================
 void wifi_app_init(void)
 {
-    // NVS é necessário para o driver de Wi-Fi
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
     {
@@ -73,22 +69,13 @@ void wifi_app_init(void)
     esp_event_handler_instance_t instance_any_id;
     esp_event_handler_instance_t instance_got_ip;
 
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
-                                                        ESP_EVENT_ANY_ID,
-                                                        &event_handler,
-                                                        NULL,
-                                                        &instance_any_id));
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,
-                                                        IP_EVENT_STA_GOT_IP,
-                                                        &event_handler,
-                                                        NULL,
-                                                        &instance_got_ip));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL, &instance_any_id));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL, &instance_got_ip));
 
     wifi_config_t wifi_config = {
         .sta = {
             .ssid = WIFI_SSID,
             .password = WIFI_PASS,
-            // Melhora compatibilidade com segurança WPA2/WPA3
             .threshold.authmode = WIFI_AUTH_WPA2_PSK,
         },
     };
@@ -112,7 +99,7 @@ bool wifi_app_check_connection(void)
 // ==========================================================
 //    ENVIO DE DADOS (HTTP POST)
 // ==========================================================
-esp_err_t wifi_send_telemetry(int16_t x, int16_t y, int16_t z, float rpm, bool em_falha)
+esp_err_t wifi_send_telemetry(int16_t x, int16_t y, int16_t z, float rpm, int status)
 {
     if (!wifi_app_check_connection())
     {
@@ -120,7 +107,6 @@ esp_err_t wifi_send_telemetry(int16_t x, int16_t y, int16_t z, float rpm, bool e
         return ESP_FAIL;
     }
 
-    // 1. Configuração do Cliente HTTP
     esp_http_client_config_t config = {
         .url = WEB_SERVER_URL,
         .method = HTTP_METHOD_POST,
@@ -134,34 +120,31 @@ esp_err_t wifi_send_telemetry(int16_t x, int16_t y, int16_t z, float rpm, bool e
         return ESP_FAIL;
     }
 
-    // 2. Montagem do JSON (String Formatada)
-    // Usando buffer estático para evitar fragmentação de heap
+    // Buffer para o JSON
     char json_payload[150];
 
-    /* Formato do JSON:
+    /* Novo Formato do JSON:
     {
         "uid_hardware": "ESP32-S3-001",
         "eixo_x": 15400,
         "eixo_y": 1300,
         "eixo_z": 1500,
         "rpm": 3500.50,
-        "em_falha": false
+        "status": 0  <-- Inteiro de 0 a 4
     }
     */
     snprintf(json_payload, sizeof(json_payload),
-             "{\"uid_hardware\":\"%s\",\"eixo_x\":%d,\"eixo_y\":%d,\"eixo_z\":%d,\"rpm\":%.2f,\"em_falha\":%s}",
+             "{\"uid_hardware\":\"%s\",\"eixo_x\":%d,\"eixo_y\":%d,\"eixo_z\":%d,\"rpm\":%.2f,\"em_falha\":%d}",
              HARDWARE_UID,
              x,
              y,
              z,
              rpm,
-             em_falha ? "true" : "false");
+             status);
 
-    // 3. Configura Headers e Payload
     esp_http_client_set_header(client, "Content-Type", "application/json");
     esp_http_client_set_post_field(client, json_payload, strlen(json_payload));
 
-    // 4. Executa a Requisição
     esp_err_t err = esp_http_client_perform(client);
 
     if (err == ESP_OK)
@@ -169,11 +152,11 @@ esp_err_t wifi_send_telemetry(int16_t x, int16_t y, int16_t z, float rpm, bool e
         int status_code = esp_http_client_get_status_code(client);
         if (status_code >= 200 && status_code < 300)
         {
-            // ESP_LOGI(TAG, "Dados enviados! Status: %d", status_code);
+            // Sucesso
         }
         else
         {
-            ESP_LOGW(TAG, "Servidor recebeu mas retornou erro. Status: %d", status_code);
+            ESP_LOGW(TAG, "Servidor HTTP retornou erro: %d", status_code);
         }
     }
     else
