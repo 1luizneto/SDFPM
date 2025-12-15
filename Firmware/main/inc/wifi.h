@@ -10,7 +10,7 @@
 #define WIFI_PASS "w1f1:Assert!!"
 
 // IP do seu computador e a rota da API
-#define WEB_SERVER_URL "http://192.168.10.179:8000/api/leituras/registrar/"
+#define WEB_SERVER_URL "http://192.168.10.86:8000/api/leituras/registrar/"
 
 // ID do Hardware fixo
 #define HARDWARE_UID "ESP32-S3-002"
