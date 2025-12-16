@@ -1,3 +1,6 @@
+Link do vídeo https://www.youtube.com/watch?v=uesVgoCXy3U
+
+
 # SDFPM - Sistemas de Detecção de Falhas Preditiva de Motor DC
 
 
