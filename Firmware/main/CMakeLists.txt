@@ -10,6 +10,7 @@ idf_component_register(
     REQUIRES 
         esp-tflite-micro
         driver
+        esp_driver_gpio
         esp_wifi
         nvs_flash
         esp_http_client
